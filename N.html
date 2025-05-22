@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>إدارة المكاتب والمنتجات</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button.delete {
+      background-color: red;
+    }
+    .office {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .office h3 {
+      cursor: pointer;
+      color: #007bff;
+      margin: 0;
+    }
+    .details {
+      margin-top: 10px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .product {
+      background: #f9f9f9;
+      border: 1px dashed #aaa;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .productForm, .products {
+      margin-top: 15px;
+      display: none;
+    }
+    a {
+      color: #007bff;
+    }
+    img.product-image {
+      max-width: 100px;
+      display: block;
+      margin-bottom: 8px;
+      border-radius: 6px;
+    }
+    .loading {
+      display: inline-block;
+      margin-right: 10px;
+      color: #666;
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, doc, getDocs, deleteDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { 
+      getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDx28eWz-H6QWyOeu6BPbYw5zQ3TEpAOOA",
+      authDomain: "webweb-19f1e.firebaseapp.com",
+      projectId: "webweb-19f1e",
+      storageBucket: "webweb-19f1e.appspot.com",
+      messagingSenderId: "418636654072",
+      appId: "1:418636654072:web:39a21734e91fb13262e20d",
+      measurementId: "G-0GH2TLYNZ8"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    window.addOffice = async function () {
+      const name = document.getElementById('officeName').value.trim();
+      const address = document.getElementById('officeAddress').value.trim();
+      const phone = document.getElementById('officePhone').value.trim();
+      const contact = document.getElementById('officeContact').value.trim();
+      const link = document.getElementById('officeLink').value.trim();
+
+      if (!name) return alert("يرجى إدخال اسم المكتب");
+
+      const officeData = { name, address, phone, contact, link };
+
+      try {
+        const officeRef = await addDoc(collection(db, "offices"), officeData);
+        window.createOfficeElement(officeRef.id, officeData);
+
+        // مسح حقول النموذج
+        document.getElementById('officeName').value = '';
+        document.getElementById('officeAddress').value = '';
+        document.getElementById('officePhone').value = '';
+        document.getElementById('officeContact').value = '';
+        document.getElementById('officeLink').value = '';
+        
+        document.getElementById('officeForm').style.display = 'none';
+      } catch (error) {
+        alert("فشل في إضافة المكتب: " + error.message);
+      }
+    };
+
+    window.createOfficeElement = function (id, data) {
+      const officeDiv = document.createElement('div');
+      officeDiv.className = "office";
+      officeDiv.dataset.id = id;
+
+      officeDiv.innerHTML = `
+        <h3 onclick="toggleOfficeDetails(this)">${data.name}</h3>
+        <div class="details">
+          <p><strong>العنوان:</strong> ${data.address || ''}</p>
+          <p><strong>الموبايل:</strong> ${data.phone || ''}</p>
+          <p><strong>اتصال آخر:</strong> ${data.contact || ''}</p>
+          <p><strong>رابط:</strong> <a href="${data.link || '#'}" target="_blank">${data.link || ''}</a></p>
+          <button onclick="showProductForm(this)">➕ إضافة منتج</button>
+          <button onclick="deleteOffice(this)" class="delete">🗑 حذف المكتب</button>
+          <div class="productForm">
+            <input type="text" placeholder="اسم المنتج" />
+            <textarea placeholder="ملاحظات"></textarea>
+            <input type="file" accept="image/*" />
+            <button onclick="addProduct(this)">📥 حفظ المنتج</button>
+          </div>
+          <div class="products"></div>
+        </div>
+      `;
+
+      document.getElementById('officesContainer').appendChild(officeDiv);
+    };
+
+    window.showProductForm = function (btn) {
+      const form = btn.nextElementSibling.nextElementSibling;
+      form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    };
+
+    window.toggleOfficeDetails = function (title) {
+      const details = title.nextElementSibling;
+      const products = details.querySelector('.products');
+      products.style.display = products.style.display === 'block' ? 'none' : 'block';
+    };
+
+    window.addProduct = async function (btn) {
+      const form = btn.parentElement;
+      const name = form.querySelector('input[type="text"]').value.trim();
+      const notes = form.querySelector('textarea').value.trim();
+      const fileInput = form.querySelector('input[type="file"]');
+      const imageFile = fileInput.files[0];
+
+      if (!name) return alert("يرجى إدخال اسم المنتج");
+
+      const officeDiv = form.closest('.office');
+      const officeId = officeDiv.dataset.id;
+      const productsContainer = officeDiv.querySelector('.products');
+
+      // إضافة مؤشر التحميل
+      btn.disabled = true;
+      let loadingSpan = document.createElement('span');
+      loadingSpan.className = 'loading';
+      loadingSpan.textContent = 'جاري الحفظ...';
+      btn.parentNode.insertBefore(loadingSpan, btn);
+
+      try {
+        let imageData = "";
+
+        // تحويل الصورة إلى Base64 إذا تم اختيارها
+        if (imageFile) {
+          // ضغط وتحويل الصورة إلى قماش Canvas
+          imageData = await new Promise((resolve, reject) => {
+            try {
+              const img = new Image();
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              
+              img.onload = function() {
+                // ضغط حجم الصورة
+                let width = img.width;
+                let height = img.height;
+                
+                // تقليل الحجم إذا كانت الصورة كبيرة
+                const maxSize = 600;
+                if (width > maxSize || height > maxSize) {
+                  if (width > height) {
+                    height = Math.round(height * (maxSize / width));
+                    width = maxSize;
+                  } else {
+                    width = Math.round(width * (maxSize / height));
+                    height = maxSize;
+                  }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // رسم الصورة المضغوطة على القماش
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // تحويل إلى Base64 مع جودة 0.7 (70%)
+                const compressedImage = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(compressedImage);
+              };
+              
+              img.onerror = function() {
+                reject(new Error("فشل تحميل الصورة"));
+              };
+              
+              // تحويل الملف إلى URL مؤقت
+              const url = URL.createObjectURL(imageFile);
+              img.src = url;
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }
+
+        // إنشاء بيانات المنتج مع الصورة
+        const product = { name, notes, imageData };
+        
+        // حفظ في Firestore
+        const productRef = await addDoc(collection(doc(db, "offices", officeId), "products"), product);
+        
+        // عرض المنتج في الواجهة
+        renderProduct(productsContainer, product, productRef.id);
+
+        // مسح حقول النموذج
+        form.querySelector('input[type="text"]').value = '';
+        form.querySelector('textarea').value = '';
+        form.querySelector('input[type="file"]').value = '';
+        
+        form.style.display = 'none';
+      } catch (error) {
+        alert("خطأ في حفظ المنتج: " + error.message);
+        console.error(error);
+      } finally {
+        // إزالة مؤشر التحميل
+        btn.disabled = false;
+        if (loadingSpan) loadingSpan.remove();
+      }
+    };
+
+    function renderProduct(container, product, id = null) {
+      const div = document.createElement('div');
+      div.className = "product";
+      if (id) div.dataset.id = id;
+      div.innerHTML = `
+        ${product.imageData ? `<img src="${product.imageData}" alt="صورة المنتج" class="product-image" />` : ''}
+        <strong>${product.name}</strong>
+        <p>${product.notes || ''}</p>
+        <button onclick="deleteProduct(this)" class="delete">🗑 حذف المنتج</button>
+      `;
+      container.appendChild(div);
+    }
+
+    window.deleteProduct = async function (btn) {
+      const productDiv = btn.closest(".product");
+      const productId = productDiv.dataset.id;
+      const officeDiv = btn.closest(".office");
+      const officeId = officeDiv.dataset.id;
+
+      if (!confirm("هل تريد حذف هذا المنتج؟")) return;
+
+      try {
+        // الحصول على بيانات المنتج للتحقق من وجود صورة
+        const productDoc = await getDocs(collection(doc(db, "offices", officeId), "products"));
+        for (const doc of productDoc.docs) {
+          if (doc.id === productId) {
+            const productData = doc.data();
+            
+            // حذف الصورة من التخزين إذا كانت موجودة
+            if (productData.imageUrl) {
+              // استخراج اسم الملف من الرابط
+              const imageUrlPath = decodeURIComponent(productData.imageUrl.split('/o/')[1].split('?')[0]);
+              const imageRef = ref(storage, imageUrlPath);
+              try {
+                await deleteObject(imageRef);
+              } catch (imageError) {
+                console.error("خطأ في حذف الصورة:", imageError);
+              }
+            }
+            break;
+          }
+        }
+
+        // حذف المنتج من Firestore
+        await deleteDoc(doc(db, "offices", officeId, "products", productId));
+        productDiv.remove();
+      } catch (error) {
+        alert("خطأ في حذف المنتج: " + error.message);
+      }
+    };
+
+    window.deleteOffice = async function (btn) {
+      const officeDiv = btn.closest(".office");
+      const officeId = officeDiv.dataset.id;
+
+      if (!confirm("هل تريد حذف هذا المكتب وكل منتجاته؟")) return;
+
+      try {
+        // الحصول على جميع منتجات المكتب
+        const productsSnap = await getDocs(collection(doc(db, "offices", officeId), "products"));
+        
+        // حذف المنتجات والصور المرتبطة بها
+        for (const productDoc of productsSnap.docs) {
+          const productData = productDoc.data();
+          
+          // حذف الصورة إذا كانت موجودة
+          if (productData.imageUrl) {
+            const imageUrlPath = decodeURIComponent(productData.imageUrl.split('/o/')[1].split('?')[0]);
+            const imageRef = ref(storage, imageUrlPath);
+            try {
+              await deleteObject(imageRef);
+            } catch (imageError) {
+              console.error("خطأ في حذف صورة المنتج:", imageError);
+            }
+          }
+          
+          // حذف وثيقة المنتج
+          await deleteDoc(productDoc.ref);
+        }
+        
+        // حذف المكتب
+        await deleteDoc(doc(db, "offices", officeId));
+        officeDiv.remove();
+      } catch (error) {
+        alert("خطأ في حذف المكتب: " + error.message);
+      }
+    };
+
+    window.loadOffices = async function () {
+      try {
+        // تحميل جميع المكاتب
+        const snapshot = await getDocs(collection(db, "offices"));
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data();
+          createOfficeElement(docSnap.id, data);
+          
+          // تحميل منتجات كل مكتب
+          const productsSnapshot = await getDocs(collection(doc(db, "offices", docSnap.id), "products"));
+          const officeDiv = document.querySelector(`.office[data-id="${docSnap.id}"]`);
+          const productsContainer = officeDiv.querySelector('.products');
+          
+          // عرض كل منتج
+          for (const productDoc of productsSnapshot.docs) {
+            renderProduct(productsContainer, productDoc.data(), productDoc.id);
+          }
+        }
+      } catch (error) {
+        console.error("خطأ في تحميل البيانات:", error);
+        alert("خطأ في تحميل البيانات: " + error.message);
+      }
+    };
+
+    // تشغيل عند تحميل الصفحة
+    window.addEventListener('DOMContentLoaded', loadOffices);
+  </script>
+</head>
+<body>
+  <h1>إدارة المكاتب والمنتجات</h1>
+  <button onclick="document.getElementById('officeForm').style.display = 'block'">➕ إضافة مكتب جديد</button>
+
+  <div id="officeForm" style="display:none; margin-top:15px;">
+    <input type="text" id="officeName" placeholder="اسم المكتب" />
+    <input type="text" id="officeAddress" placeholder="العنوان" />
+    <input type="text" id="officePhone" placeholder="الموبايل" />
+    <input type="text" id="officeContact" placeholder="اتصال آخر" />
+    <input type="url" id="officeLink" placeholder="رابط الموقع" />
+    <button onclick="addOffice()">💾 حفظ المكتب</button>
+  </div>
+
+  <div id="officesContainer" style="margin-top:20px;"></div>
+</body>
+</html>
