@@ -16,6 +16,8 @@
       --border-color: #e2e8f0;
       --success-color: #22c55e;
       --red-color: #dc2626;
+      --link-color: #3b82f6;
+      --link-hover: #1d4ed8;
     }
     
     /* تنسيقات عامة */
@@ -108,6 +110,7 @@
       border-radius: 8px;
       transition: all 0.2s;
       font-family: inherit;
+      box-sizing: border-box;
     }
     
     input:focus, textarea:focus {
@@ -139,12 +142,45 @@
     }
     
     a {
-      color: var(--primary-color);
+      color: var(--link-color);
       text-decoration: none;
+      transition: color 0.2s;
     }
     
     a:hover {
+      color: var(--link-hover);
       text-decoration: underline;
+    }
+    
+    /* روابط قابلة للنقر في الجداول */
+    .clickable-link {
+      color: var(--link-color);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s;
+      display: inline-block;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      font-weight: 500;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .clickable-link:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--link-color);
+      color: var(--link-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(59, 130, 246, 0.3);
+    }
+    
+    .clickable-link:before {
+      content: "🔗";
+      margin-left: 6px;
+      font-size: 0.9em;
     }
     
     /* صور المنتجات */
@@ -401,6 +437,112 @@
       display: block;
     }
     
+    /* نافذة التعديل */
+    .edit-form-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .edit-form-modal {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 25px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease;
+    }
+    
+    .edit-form-modal h3 {
+      color: var(--primary-color);
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 1.3rem;
+    }
+    
+    .edit-form-modal .form-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .edit-form-modal .form-group {
+      flex: 1;
+      min-width: 250px;
+    }
+    
+    .edit-form-modal label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text-color);
+      font-weight: 500;
+    }
+    
+    .edit-form-modal input,
+    .edit-form-modal textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    
+    .edit-form-modal textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    
+    .edit-form-modal .form-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 25px;
+    }
+    
+    .edit-form-modal button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: white;
+    }
+    
+    .edit-form-modal button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideIn {
+      from { 
+        opacity: 0;
+        transform: translateY(-50px);
+      }
+      to { 
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     /* تعديلات للنسخة المحمولة */
     @media (max-width: 768px) {
       .sheet-table {
@@ -411,13 +553,38 @@
       .sheet-form .form-row {
         flex-direction: column;
       }
+      
+      .clickable-link {
+        display: block;
+        text-align: center;
+        margin: 2px 0;
+        max-width: 150px;
+      }
+      
+      .edit-form-modal {
+        width: 95%;
+        padding: 20px;
+        margin: 10px;
+      }
+      
+      .edit-form-modal .form-row {
+        flex-direction: column;
+      }
+      
+      .edit-form-modal .form-group {
+        min-width: auto;
+      }
+      
+      .edit-form-modal .form-buttons {
+        flex-direction: column;
+      }
     }
   </style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
-      getFirestore, collection, addDoc, doc, getDocs, deleteDoc
+      getFirestore, collection, addDoc, doc, getDocs, deleteDoc, updateDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { 
       getStorage, ref, uploadBytes, getDownloadURL, deleteObject
@@ -437,6 +604,38 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
+    // تحميل البيانات عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadOffices();
+      await loadCustomers();
+      await loadAdmins();
+      initializeTabs();
+    });
+
+    // تهيئة علامات التبويب
+    function initializeTabs() {
+      // التأكد من أن علامة التبويب الأولى مفعلة
+      const firstTab = document.querySelector('.tab-button');
+      const firstPanel = document.querySelector('.tab-panel');
+      if (firstTab && firstPanel) {
+        firstTab.classList.add('active');
+        firstPanel.classList.add('active');
+      }
+    }
+
+    // تحميل المكاتب من Firebase
+    async function loadOffices() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "offices"));
+        querySnapshot.forEach((doc) => {
+          window.createOfficeElement(doc.id, doc.data());
+        });
+      } catch (error) {
+        console.error("خطأ في تحميل المكاتب:", error);
+      }
+    }
+
+    // إضافة مكتب جديد
     window.addOffice = async function () {
       const name = document.getElementById('officeName').value.trim();
       const address = document.getElementById('officeAddress').value.trim();
@@ -465,10 +664,15 @@
       }
     };
 
+    // إنشاء عنصر المكتب
     window.createOfficeElement = function (id, data) {
       const officeDiv = document.createElement('div');
       officeDiv.className = "office";
       officeDiv.dataset.id = id;
+
+      const linkDisplay = data.link ? 
+        `<a href="${data.link}" target="_blank">${data.link}</a>` : 
+        'لا يوجد رابط';
 
       officeDiv.innerHTML = `
         <h3 onclick="toggleOfficeDetails(this)">${data.name}</h3>
@@ -476,7 +680,7 @@
           <p><strong>العنوان:</strong> ${data.address || ''}</p>
           <p><strong>الموبايل:</strong> ${data.phone || ''}</p>
           <p><strong>اتصال آخر:</strong> ${data.contact || ''}</p>
-          <p><strong>رابط:</strong> <a href="${data.link || '#'}" target="_blank">${data.link || ''}</a></p>
+          <p><strong>رابط:</strong> ${linkDisplay}</p>
           <button onclick="showProductForm(this)">➕ إضافة منتج</button>
           <button onclick="deleteOffice(this)" class="delete">🗑 حذف المكتب</button>
           <div class="productForm">
@@ -528,7 +732,6 @@
 
         // تحويل الصورة إلى Base64 إذا تم اختيارها
         if (imageFile) {
-          // ضغط وتحويل الصورة إلى قماش Canvas
           imageData = await new Promise((resolve, reject) => {
             try {
               const img = new Image();
@@ -536,11 +739,9 @@
               const ctx = canvas.getContext('2d');
               
               img.onload = function() {
-                // ضغط حجم الصورة
                 let width = img.width;
                 let height = img.height;
                 
-                // تقليل الحجم إذا كانت الصورة كبيرة
                 const maxSize = 600;
                 if (width > maxSize || height > maxSize) {
                   if (width > height) {
@@ -554,11 +755,8 @@
                 
                 canvas.width = width;
                 canvas.height = height;
-                
-                // رسم الصورة المضغوطة على القماش
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // تحويل إلى Base64 مع جودة 0.7 (70%)
                 const compressedImage = canvas.toDataURL('image/jpeg', 0.7);
                 resolve(compressedImage);
               };
@@ -567,7 +765,6 @@
                 reject(new Error("فشل تحميل الصورة"));
               };
               
-              // تحويل الملف إلى URL مؤقت
               const url = URL.createObjectURL(imageFile);
               img.src = url;
             } catch (e) {
@@ -576,16 +773,11 @@
           });
         }
 
-        // إنشاء بيانات المنتج مع الصورة
         const product = { name, notes, imageData };
         
-        // حفظ في Firestore
         const productRef = await addDoc(collection(doc(db, "offices", officeId), "products"), product);
-        
-        // عرض المنتج في الواجهة
         renderProduct(productsContainer, product, productRef.id);
 
-        // مسح حقول النموذج
         form.querySelector('input[type="text"]').value = '';
         form.querySelector('textarea').value = '';
         form.querySelector('input[type="file"]').value = '';
@@ -595,7 +787,6 @@
         alert("خطأ في حفظ المنتج: " + error.message);
         console.error(error);
       } finally {
-        // إزالة مؤشر التحميل
         btn.disabled = false;
         if (loadingSpan) loadingSpan.remove();
       }
@@ -614,9 +805,7 @@
       container.appendChild(div);
     }
     
-    // دالة لفتح نافذة عرض الصورة بحجم كبير
     window.openImageModal = function(imgElement) {
-      // إنشاء نافذة العرض إذا لم تكن موجودة بالفعل
       let modal = document.getElementById('imageModal');
       if (!modal) {
         modal = document.createElement('div');
@@ -631,15 +820,12 @@
         document.body.appendChild(modal);
       }
       
-      // تعيين مصدر الصورة والعرض
       document.getElementById('modalImage').src = imgElement.src;
       
-      // إظهار النافذة بتأثير انتقالي
       setTimeout(() => {
         modal.classList.add('active');
       }, 10);
       
-      // إغلاق النافذة عند النقر خارج الصورة
       modal.onclick = function(event) {
         if (event.target === modal) {
           closeImageModal();
@@ -647,7 +833,6 @@
       };
     };
     
-    // دالة لإغلاق نافذة عرض الصورة
     window.closeImageModal = function() {
       const modal = document.getElementById('imageModal');
       if (modal) {
@@ -664,28 +849,6 @@
       if (!confirm("هل تريد حذف هذا المنتج؟")) return;
 
       try {
-        // الحصول على بيانات المنتج للتحقق من وجود صورة
-        const productDoc = await getDocs(collection(doc(db, "offices", officeId), "products"));
-        for (const doc of productDoc.docs) {
-          if (doc.id === productId) {
-            const productData = doc.data();
-            
-            // حذف الصورة من التخزين إذا كانت موجودة
-            if (productData.imageUrl) {
-              // استخراج اسم الملف من الرابط
-              const imageUrlPath = decodeURIComponent(productData.imageUrl.split('/o/')[1].split('?')[0]);
-              const imageRef = ref(storage, imageUrlPath);
-              try {
-                await deleteObject(imageRef);
-              } catch (imageError) {
-                console.error("خطأ في حذف الصورة:", imageError);
-              }
-            }
-            break;
-          }
-        }
-
-        // حذف المنتج من Firestore
         await deleteDoc(doc(db, "offices", officeId, "products", productId));
         productDiv.remove();
       } catch (error) {
@@ -700,120 +863,60 @@
       if (!confirm("هل تريد حذف هذا المكتب وكل منتجاته؟")) return;
 
       try {
-        // الحصول على جميع منتجات المكتب
         const productsSnap = await getDocs(collection(doc(db, "offices", officeId), "products"));
         
-        // حذف المنتجات والصور المرتبطة بها
         for (const productDoc of productsSnap.docs) {
-          const productData = productDoc.data();
-          
-          // حذف الصورة إذا كانت موجودة
-          if (productData.imageUrl) {
-            const imageUrlPath = decodeURIComponent(productData.imageUrl.split('/o/')[1].split('?')[0]);
-            const imageRef = ref(storage, imageUrlPath);
-            try {
-              await deleteObject(imageRef);
-            } catch (imageError) {
-              console.error("خطأ في حذف صورة المنتج:", imageError);
-            }
-          }
-          
-          // حذف وثيقة المنتج
           await deleteDoc(productDoc.ref);
         }
         
-        // حذف المكتب
         await deleteDoc(doc(db, "offices", officeId));
         officeDiv.remove();
       } catch (error) {
         alert("خطأ في حذف المكتب: " + error.message);
       }
     };
-
-    window.loadOffices = async function () {
-      try {
-        // تحميل جميع المكاتب
-        const snapshot = await getDocs(collection(db, "offices"));
-        for (const docSnap of snapshot.docs) {
-          const data = docSnap.data();
-          createOfficeElement(docSnap.id, data);
-          
-          // تحميل منتجات كل مكتب
-          const productsSnapshot = await getDocs(collection(doc(db, "offices", docSnap.id), "products"));
-          const officeDiv = document.querySelector(`.office[data-id="${docSnap.id}"]`);
-          const productsContainer = officeDiv.querySelector('.products');
-          
-          // عرض كل منتج
-          for (const productDoc of productsSnapshot.docs) {
-            renderProduct(productsContainer, productDoc.data(), productDoc.id);
-          }
-        }
-      } catch (error) {
-        console.error("خطأ في تحميل البيانات:", error);
-        alert("خطأ في تحميل البيانات: " + error.message);
-      }
-    };
-
-    // تشغيل عند تحميل الصفحة
-    window.addEventListener('DOMContentLoaded', () => {
-      loadOffices();
-      loadCustomers();
-      loadAdmins();
-    });
     
     // -------------------- وظائف الشيت (الجدول) --------------------
     
-    // فتح وإغلاق نموذج إضافة العميل
     window.toggleSheetForm = function() {
       const form = document.getElementById('sheetForm');
       form.style.display = form.style.display === 'block' ? 'none' : 'block';
     };
     
-    // فتح علامة التبويب المحددة
     window.openTab = function(evt, tabName) {
-      // إخفاء جميع محتويات علامات التبويب
       const tabPanels = document.getElementsByClassName('tab-panel');
       for (let i = 0; i < tabPanels.length; i++) {
         tabPanels[i].classList.remove('active');
       }
       
-      // إزالة الفئة النشطة من جميع أزرار علامات التبويب
       const tabButtons = document.getElementsByClassName('tab-button');
       for (let i = 0; i < tabButtons.length; i++) {
         tabButtons[i].classList.remove('active');
       }
       
-      // إظهار علامة التبويب الحالية وإضافة الفئة النشطة للزر
       document.getElementById(tabName).classList.add('active');
       evt.currentTarget.classList.add('active');
     };
-    
-    // مجموعة من العملاء للاختبار (ستستبدل بالبيانات من Firebase)
-    let customers = [];
     
     // إضافة عميل جديد
     window.addCustomer = async function() {
       const name = document.getElementById('customerName').value.trim();
       const phone = document.getElementById('customerPhone').value.trim();
       const address = document.getElementById('customerAddress').value.trim();
-      const product = document.getElementById('customerProduct').value.trim();
+      const link = document.getElementById('customerLink').value.trim();
       
       if (!name) return alert("يرجى إدخال اسم العميل");
       
-      const customerData = { name, phone, address, product };
+      const customerData = { name, phone, address, link };
       
       try {
-        // إضافة العميل إلى Firebase
         const customerRef = await addDoc(collection(db, "customers"), customerData);
-        
-        // إضافة العميل إلى واجهة المستخدم
         renderCustomerRow(customerRef.id, customerData);
         
-        // مسح النموذج وإخفائه
         document.getElementById('customerName').value = '';
         document.getElementById('customerPhone').value = '';
         document.getElementById('customerAddress').value = '';
-        document.getElementById('customerProduct').value = '';
+        document.getElementById('customerLink').value = '';
         document.getElementById('sheetForm').style.display = 'none';
         
       } catch (error) {
@@ -827,15 +930,19 @@
       const row = document.createElement('tr');
       row.dataset.id = id;
       
-      // تحديد رقم الصف
       const rowNumber = tbody.children.length + 1;
+      
+      // تنسيق الرابط القابل للنقر
+      const linkDisplay = data.link ? 
+        `<a href="${data.link}" target="_blank" class="clickable-link">${data.link}</a>` : 
+        'لا يوجد رابط';
       
       row.innerHTML = `
         <td>${rowNumber}</td>
         <td>${data.name}</td>
         <td>${data.phone || ''}</td>
         <td>${data.address || ''}</td>
-        <td>${data.product || ''}</td>
+        <td>${linkDisplay}</td>
         <td>
           <button class="sheet-action-btn edit-btn" onclick="editCustomer('${id}')">تعديل</button>
           <button class="sheet-action-btn delete-btn" onclick="deleteCustomer('${id}')">حذف</button>
@@ -845,25 +952,111 @@
       tbody.appendChild(row);
     }
     
-    // تعديل بيانات العميل
     window.editCustomer = async function(id) {
-      alert("سيتم إضافة وظيفة التعديل قريبًا");
-      // تنفيذ وظيفة التعديل لاحقًا
+      try {
+        // العثور على بيانات العميل
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (!row) return;
+        
+        const cells = row.querySelectorAll('td');
+        const currentData = {
+          name: cells[1].textContent,
+          phone: cells[2].textContent,
+          address: cells[3].textContent,
+          link: cells[4].querySelector('a') ? cells[4].querySelector('a').href : ''
+        };
+        
+        // إنشاء نموذج التعديل
+        const editForm = document.createElement('div');
+        editForm.className = 'edit-form-overlay';
+        editForm.innerHTML = `
+          <div class="edit-form-modal">
+            <h3>تعديل بيانات العميل</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>اسم العميل</label>
+                <input type="text" id="editCustomerName" value="${currentData.name}" />
+              </div>
+              <div class="form-group">
+                <label>رقم الهاتف</label>
+                <input type="text" id="editCustomerPhone" value="${currentData.phone}" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>العنوان</label>
+                <input type="text" id="editCustomerAddress" value="${currentData.address}" />
+              </div>
+              <div class="form-group">
+                <label>لينك</label>
+                <input type="url" id="editCustomerLink" value="${currentData.link}" />
+              </div>
+            </div>
+            <div class="form-buttons">
+              <button onclick="saveCustomerEdit('${id}')" style="background-color: var(--success-color);">حفظ التعديل</button>
+              <button onclick="closeEditForm()" style="background-color: var(--accent-color);">إلغاء</button>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(editForm);
+        
+      } catch (error) {
+        alert("خطأ في فتح نموذج التعديل: " + error.message);
+      }
     };
     
-    // حذف العميل
+    window.saveCustomerEdit = async function(id) {
+      const name = document.getElementById('editCustomerName').value.trim();
+      const phone = document.getElementById('editCustomerPhone').value.trim();
+      const address = document.getElementById('editCustomerAddress').value.trim();
+      const link = document.getElementById('editCustomerLink').value.trim();
+      
+      if (!name) return alert("يرجى إدخال اسم العميل");
+      
+      try {
+        const updatedData = { name, phone, address, link };
+        
+        // تحديث البيانات في Firebase
+        await updateDoc(doc(db, "customers", id), updatedData);
+        
+        // تحديث الصف في الجدول
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        const cells = row.querySelectorAll('td');
+        
+        cells[1].textContent = name;
+        cells[2].textContent = phone;
+        cells[3].textContent = address;
+        
+        const linkDisplay = link ? 
+          `<a href="${link}" target="_blank" class="clickable-link">${link}</a>` : 
+          'لا يوجد رابط';
+        cells[4].innerHTML = linkDisplay;
+        
+        closeEditForm();
+        alert("تم تعديل بيانات العميل بنجاح!");
+        
+      } catch (error) {
+        alert("خطأ في تعديل البيانات: " + error.message);
+      }
+    };
+    
+    window.closeEditForm = function() {
+      const editForm = document.querySelector('.edit-form-overlay');
+      if (editForm) {
+        editForm.remove();
+      }
+    };
+    
     window.deleteCustomer = async function(id) {
       if (!confirm("هل أنت متأكد من حذف هذا العميل؟")) return;
       
       try {
-        // حذف العميل من Firebase
         await deleteDoc(doc(db, "customers", id));
         
-        // حذف صف العميل من الجدول
         const row = document.querySelector(`tr[data-id="${id}"]`);
         if (row) row.remove();
         
-        // إعادة ترقيم الصفوف
         const rows = document.querySelectorAll('#customersTableBody tr');
         rows.forEach((row, index) => {
           row.firstElementChild.textContent = index + 1;
@@ -874,17 +1067,12 @@
       }
     };
     
-    // تحميل العملاء من Firebase
     async function loadCustomers() {
       try {
-        // جلب جميع العملاء من Firebase
         const snapshot = await getDocs(collection(db, "customers"));
-        
-        // عرض كل عميل في الجدول
         snapshot.docs.forEach(doc => {
           renderCustomerRow(doc.id, doc.data());
         });
-        
       } catch (error) {
         console.error("خطأ في تحميل بيانات العملاء:", error);
       }
@@ -892,13 +1080,11 @@
     
     // -------------------- وظائف شيت الأدمنز --------------------
     
-    // فتح وإغلاق نموذج إضافة الأدمن
     window.toggleAdminForm = function() {
       const form = document.getElementById('adminForm');
       form.style.display = form.style.display === 'block' ? 'none' : 'block';
     };
     
-    // إضافة أدمن جديد
     window.addAdmin = async function() {
       const platform = document.getElementById('platformName').value.trim();
       const username = document.getElementById('userName').value.trim();
@@ -920,13 +1106,9 @@
       };
       
       try {
-        // إضافة الأدمن إلى Firebase
         const adminRef = await addDoc(collection(db, "admins"), adminData);
-        
-        // إضافة الأدمن إلى واجهة المستخدم
         renderAdminRow(adminRef.id, adminData);
         
-        // مسح النموذج وإخفائه
         document.getElementById('platformName').value = '';
         document.getElementById('userName').value = '';
         document.getElementById('email').value = '';
@@ -940,16 +1122,13 @@
       }
     };
     
-    // إنشاء صف في الجدول للأدمن
     function renderAdminRow(id, data) {
       const tbody = document.getElementById('adminsTableBody');
       const row = document.createElement('tr');
       row.dataset.id = id;
       
-      // تحديد رقم الصف
       const rowNumber = tbody.children.length + 1;
       
-      // إخفاء كلمة المرور وإظهار زر لإظهارها
       const passwordDisplay = `<span class="password-hidden">••••••••</span>
                               <button class="password-toggle" onclick="togglePassword(this)" data-password="${data.password || ''}">👁️</button>`;
       
@@ -970,7 +1149,6 @@
       tbody.appendChild(row);
     }
     
-    // إظهار/إخفاء كلمة المرور
     window.togglePassword = function(button) {
       const passwordSpan = button.previousElementSibling;
       const password = button.getAttribute('data-password');
@@ -986,25 +1164,123 @@
       }
     };
     
-    // تعديل بيانات الأدمن
     window.editAdmin = async function(id) {
-      alert("سيتم إضافة وظيفة التعديل قريبًا");
-      // تنفيذ وظيفة التعديل لاحقًا
+      try {
+        // العثور على بيانات الأدمن
+        const row = document.querySelector(`#adminsTableBody tr[data-id="${id}"]`);
+        if (!row) return;
+        
+        const cells = row.querySelectorAll('td');
+        const passwordButton = cells[4].querySelector('.password-toggle');
+        const currentPassword = passwordButton ? passwordButton.getAttribute('data-password') : '';
+        
+        const currentData = {
+          platform: cells[1].textContent,
+          username: cells[2].textContent,
+          email: cells[3].textContent,
+          password: currentPassword,
+          phone: cells[5].textContent,
+          notes: cells[6].textContent
+        };
+        
+        // إنشاء نموذج التعديل
+        const editForm = document.createElement('div');
+        editForm.className = 'edit-form-overlay';
+        editForm.innerHTML = `
+          <div class="edit-form-modal">
+            <h3>تعديل بيانات الأدمن</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>اسم المنصة</label>
+                <input type="text" id="editPlatformName" value="${currentData.platform}" />
+              </div>
+              <div class="form-group">
+                <label>اسم المستخدم</label>
+                <input type="text" id="editUserName" value="${currentData.username}" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>البريد الإلكتروني</label>
+                <input type="email" id="editEmail" value="${currentData.email}" />
+              </div>
+              <div class="form-group">
+                <label>كلمة المرور</label>
+                <input type="password" id="editPassword" value="${currentData.password}" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>رقم الموبايل</label>
+                <input type="text" id="editPhoneNumber" value="${currentData.phone}" />
+              </div>
+              <div class="form-group">
+                <label>ملاحظات</label>
+                <textarea id="editNotes">${currentData.notes}</textarea>
+              </div>
+            </div>
+            <div class="form-buttons">
+              <button onclick="saveAdminEdit('${id}')" style="background-color: var(--red-color);">حفظ التعديل</button>
+              <button onclick="closeEditForm()" style="background-color: var(--accent-color);">إلغاء</button>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(editForm);
+        
+      } catch (error) {
+        alert("خطأ في فتح نموذج التعديل: " + error.message);
+      }
     };
     
-    // حذف الأدمن
+    window.saveAdminEdit = async function(id) {
+      const platform = document.getElementById('editPlatformName').value.trim();
+      const username = document.getElementById('editUserName').value.trim();
+      const email = document.getElementById('editEmail').value.trim();
+      const password = document.getElementById('editPassword').value.trim();
+      const phone = document.getElementById('editPhoneNumber').value.trim();
+      const notes = document.getElementById('editNotes').value.trim();
+      
+      if (!platform || !username) return alert("يرجى إدخال اسم المنصة واسم المستخدم");
+      
+      try {
+        const updatedData = { platform, username, email, password, phone, notes };
+        
+        // تحديث البيانات في Firebase
+        await updateDoc(doc(db, "admins", id), updatedData);
+        
+        // تحديث الصف في الجدول
+        const row = document.querySelector(`#adminsTableBody tr[data-id="${id}"]`);
+        const cells = row.querySelectorAll('td');
+        
+        cells[1].textContent = platform;
+        cells[2].textContent = username;
+        cells[3].textContent = email;
+        cells[5].textContent = phone;
+        cells[6].textContent = notes;
+        
+        // تحديث كلمة المرور
+        const passwordDisplay = `<span class="password-hidden">••••••••</span>
+                                <button class="password-toggle" onclick="togglePassword(this)" data-password="${password}">👁️</button>`;
+        cells[4].innerHTML = passwordDisplay;
+        
+        closeEditForm();
+        alert("تم تعديل بيانات الأدمن بنجاح!");
+        
+      } catch (error) {
+        alert("خطأ في تعديل البيانات: " + error.message);
+      }
+    };
+    
     window.deleteAdmin = async function(id) {
       if (!confirm("هل أنت متأكد من حذف هذا الأدمن؟")) return;
       
       try {
-        // حذف الأدمن من Firebase
         await deleteDoc(doc(db, "admins", id));
         
-        // حذف صف الأدمن من الجدول
         const row = document.querySelector(`#adminsTableBody tr[data-id="${id}"]`);
         if (row) row.remove();
         
-        // إعادة ترقيم الصفوف
         const rows = document.querySelectorAll('#adminsTableBody tr');
         rows.forEach((row, index) => {
           row.firstElementChild.textContent = index + 1;
@@ -1015,17 +1291,12 @@
       }
     };
     
-    // تحميل الأدمنز من Firebase
     async function loadAdmins() {
       try {
-        // جلب جميع الأدمنز من Firebase
         const snapshot = await getDocs(collection(db, "admins"));
-        
-        // عرض كل أدمن في الجدول
         snapshot.docs.forEach(doc => {
           renderAdminRow(doc.id, doc.data());
         });
-        
       } catch (error) {
         console.error("خطأ في تحميل بيانات الأدمنز:", error);
       }
@@ -1081,8 +1352,8 @@
                 <input type="text" id="customerAddress" placeholder="أدخل العنوان" />
               </div>
               <div class="form-group">
-                <label for="customerProduct">المنتج</label>
-                <input type="text" id="customerProduct" placeholder="أدخل اسم المنتج" />
+                <label for="customerLink">لينك</label>
+                <input type="url" id="customerLink" placeholder="أدخل الرابط" />
               </div>
             </div>
             <div class="form-buttons">
@@ -1098,7 +1369,7 @@
                 <th>اسم العميل</th>
                 <th>رقم الهاتف</th>
                 <th>العنوان</th>
-                <th>المنتج</th>
+                <th>لينك</th>
                 <th>الإجراءات</th>
               </tr>
             </thead>
